@@ -1,11 +1,12 @@
 import {useRef, useContext} from 'react'
 import AuthContext from '../../store/auth-context';
 import classes from './ProfileForm.module.css';
+import {useHistory} from 'react-router-dom';
 
 const {REACT_APP_API_TOKEN, REACT_APP_API_URLCHANGEPASSWORD} =process.env 
 
 const ProfileForm = () => {
-  
+  const history = useHistory();
   const url = REACT_APP_API_URLCHANGEPASSWORD+REACT_APP_API_TOKEN
   console.log(url)
   const newPasswordInputRef = useRef();
@@ -27,7 +28,7 @@ const ProfileForm = () => {
         'Content-Type':'application/json'
       }
     }).then(res=>{
-
+      history.replace('/')
     })
   }
 
