@@ -1,70 +1,222 @@
-# Getting Started with Create React App
+# Authentification
+![image](https://user-images.githubusercontent.com/104289891/210992869-0405393e-048c-4093-807b-d9618a0c03a7.png)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# React context
 
-## Available Scripts
+## Provide
 
-In the project directory, you can run:
+```javascript
+import React, {useState} from 'react';
+ 
+const AuthContext = React.createContext({
+    token: '',
+    isLoggedIn: false,
+    login: (token) => {},
+    logout: () => {},
+});
+ 
+export const AuthContextProvider = (props) => {
+    const [token, setToken] = useState(null)
+    const userIsLoggedIn = !!token;
+    const loginHandler = (token) => {
+        setToken(token);
+    }    
+    const logoutHandler = () => {
+        setToken(null);
+   
+    }
+ 
+    const contextValue = {
+        token: token,
+        isLoggedIn: userIsLoggedIn,
+        login: loginHandler,
+        logout: logoutHandler
+    }
+ 
+    return (
+    <AuthContext.Provider value={contextValue}>
+    {props.children}
+    </AuthContext.Provider>
+    )
+}
+ 
+export default AuthContext
 
-### `npm start`
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```javascript
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+ 
+import './index.css';
+import App from './App';
+import { AuthContextProvider } from './store/auth-context';
+ 
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <AuthContextProvider>
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+  </AuthContextProvider>
+);
+ 
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```
 
-### `npm test`
+## Use it
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```javascript
+import { useState, useRef, useContext } from 'react';
+import AuthContext from '../../store/auth-context'
+ 
+import classes from './AuthForm.module.css';
+ 
+const {REACT_APP_API_URL,REACT_APP_API_TOKEN, REACT_APP_API_URLSIGNIN} =process.env
+let url
+ 
+ 
+const AuthForm = () => {
+  const emailInputRef = useRef();
+  const passwordInputRef = useRef();
+ 
+  const authCtx = useContext(AuthContext)
+ 
+  const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+ 
+  const switchAuthModeHandler = () => {
+    setIsLogin((prevState) => !prevState);
+  };
+ 
+  const submitHandler = (event) => {
+    event.preventDefault();
+ 
+    const enteredEmail = emailInputRef.current.value;
+    const enteredPassword = passwordInputRef.current.value;
+ 
+    // optional: Add validation
+    setIsLoading(true);
+    if (isLogin) {
+      url = REACT_APP_API_URLSIGNIN+REACT_APP_API_TOKEN
+ 
+    } else {
+      url = REACT_APP_API_URL+REACT_APP_API_TOKEN
+   
+    }
+ 
+    fetch(url,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          email: enteredEmail,
+          password: enteredPassword,
+          returnSecureToken: true,
+        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    ).then((res) => {
+      setIsLoading(false)
+      if (res.ok) {
+       return res.json();
+      } else {
+        return res.json().then((data) => {
+          let errorMessage = 'Authentification failed';
+          if (data && data.error && data.error.message) {
+            errorMessage = data.error.message;
+          }
+         
+          throw new Error(errorMessage);
+        });
+      }
+    })
+    .then((data) => {
+      authCtx.login(data.idToken)
+    })
+    .catch((err) => {
+      alert(err.message);
+    });
+  };
+ 
+  return (
+    <section className={classes.auth}>
+      <h1>{isLogin ? 'Login' : 'Sign Up'}</h1>
+      <form onSubmit={submitHandler}>
+        <div className={classes.control}>
+          <label htmlFor='email'>Your Email</label>
+          <input type='email' id='email' required ref={emailInputRef} />
+        </div>
+        <div className={classes.control}>
+          <label htmlFor='password'>Your Password</label>
+          <input
+            type='password'
+            id='password'
+            required
+            ref={passwordInputRef}
+          />
+        </div>
+        <div className={classes.actions}>
+          {!isLoading && <button>{isLogin ? 'Login' : 'Create Account'}</button>}
+          {isLoading && <p>Sending request...</p>}
+          <button
+            type='button'
+            className={classes.toggle}
+            onClick={switchAuthModeHandler}
+          >
+            {isLogin ? 'Create new account' : 'Login with existing account'}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+};
+ 
+export default AuthForm;
 
-### `npm run build`
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```javascript
+import { Link } from 'react-router-dom';
+import { useContext } from 'react';
+import classes from './MainNavigation.module.css';
+import AuthContext from '../../store/auth-context';
+ 
+const MainNavigation = () => {
+  const authCtx=useContext(AuthContext);
+  const isLoggedIn = authCtx.isLoggedIn;
+  return (
+    <header className={classes.header}>
+      <Link to='/'>
+        <div className={classes.logo}>React Auth</div>
+      </Link>
+      <nav>
+        <ul>
+        {!isLoggedIn && (
+          <li>
+            <Link to='/auth'>Login</Link>
+          </li>
+        )}
+ 
+        {isLoggedIn && (
+          <li>
+            <Link to='/profile'>Profile</Link>
+          </li>
+        )}
+        {isLoggedIn && (
+          <li>
+            <button>Logout</button>
+          </li>
+        )}  
+       
+        </ul>
+      </nav>
+    </header>
+  );
+};
+ 
+export default MainNavigation;
+ 
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
